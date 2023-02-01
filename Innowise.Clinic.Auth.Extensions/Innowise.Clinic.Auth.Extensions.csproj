@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>Innowise.Clinic.Auth.Extensions</AssemblyName>
+        <RootNamespace>Innowise.Clinic.Auth.Extensions</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="Microsoft.AspNetCore.Authentication.JwtBearer">
+        </Reference>
+        <Reference Include="Microsoft.Extensions.Identity.Stores">
+        </Reference>
+        <Reference Include="Microsoft.OpenApi">
+        </Reference>
+        <Reference Include="Swashbuckle.AspNetCore.SwaggerGen">
+        </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Innowise.Clinic.Auth.Jwt\Innowise.Clinic.Auth.Jwt.csproj" />
+        <ProjectReference Include="..\Innowise.Clinic.Auth.Persistence\Innowise.Clinic.Auth.Persistence.csproj" />
+        <ProjectReference Include="..\Innowise.Clinic.Auth.Validators\Innowise.Clinic.Auth.Validators.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.13" />
+      <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.13" />
+      <PackageReference Include="Microsoft.OpenApi" Version="1.5.0" />
+      <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.5.0" />
+    </ItemGroup>
+
+</Project>
