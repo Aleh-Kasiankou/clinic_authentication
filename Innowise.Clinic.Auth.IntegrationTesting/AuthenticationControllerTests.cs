@@ -8,8 +8,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Innowise.Clinic.Auth.Constants;
 using Innowise.Clinic.Auth.DTO;
-using Innowise.Clinic.Auth.Persistence.Models;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
@@ -24,6 +24,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
     private const string SignUpEndpointUri = "auth/sign-up/patient";
     private const string RefreshTokenEndpointUri = "auth/token/refresh";
+    private const string SignInEndpointUri = "auth/sign-in/patient";
 
 
     public AuthenticationControllerTests(IntegrationTestingWebApplicationFactory factory)
@@ -48,7 +49,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
     {
         // Arrange
 
-        var validUserRegistrationData = new PatientSignUpDto()
+        var validUserRegistrationData = new PatientCredentialsDto()
         {
             Email = $"test{UniqueNumber}@test.com",
             Password = "12345678"
@@ -75,7 +76,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
     {
         // Arrange
 
-        var userRegistrationDataWithInvalidMail = new PatientSignUpDto()
+        var userRegistrationDataWithInvalidMail = new PatientCredentialsDto()
         {
             Email = "testInvalidEmail",
             Password = "12345678"
@@ -97,7 +98,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
     {
         // Arrange
 
-        var userRegistrationDataWithShortPassword = new PatientSignUpDto()
+        var userRegistrationDataWithShortPassword = new PatientCredentialsDto()
         {
             Email = $"test{UniqueNumber}@test.gmail.com",
             Password = "12345"
@@ -119,7 +120,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
     {
         // Arrange
 
-        var userRegistrationDataWithLongPassword = new PatientSignUpDto()
+        var userRegistrationDataWithLongPassword = new PatientCredentialsDto()
         {
             Email = $"test{UniqueNumber}@test.gmail.com",
             Password = "12345678911131517"
@@ -144,7 +145,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
         var validEmail = $"test{UniqueNumber}@test.gmail.com";
 
-        var userRegistrationDataWithRegisteredEmail = new PatientSignUpDto()
+        var userRegistrationDataWithRegisteredEmail = new PatientCredentialsDto()
         {
             Email = validEmail,
             Password = "12345678"
@@ -171,7 +172,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
     {
         // Arrange
 
-        var validUserRegistrationData = new PatientSignUpDto()
+        var validUserRegistrationData = new PatientCredentialsDto()
         {
             Email = $"test{UniqueNumber}@test.gmail.com",
             Password = "12345678"
@@ -206,7 +207,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
         var validEmail = $"test{UniqueNumber}@test.gmail.com";
 
-        var userRegistrationDataWithRegisteredEmail = new PatientSignUpDto()
+        var userRegistrationDataWithRegisteredEmail = new PatientCredentialsDto()
         {
             Email = validEmail,
             Password = "12345678"
@@ -234,7 +235,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
         var validEmail = $"test{UniqueNumber}@test.gmail.com";
 
-        var userRegistrationDataWithRegisteredEmail = new PatientSignUpDto()
+        var userRegistrationDataWithRegisteredEmail = new PatientCredentialsDto()
         {
             Email = validEmail,
             Password = "12345678"
@@ -257,7 +258,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
         var validEmail = $"test{UniqueNumber}@test.gmail.com";
 
-        var userRegistrationDataWithRegisteredEmail = new PatientSignUpDto()
+        var userRegistrationDataWithRegisteredEmail = new PatientCredentialsDto()
         {
             Email = validEmail,
             Password = "12345678"
@@ -295,7 +296,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
         var validEmail = $"test{UniqueNumber}@test.gmail.com";
 
-        var userRegistrationDataWithRegisteredEmail = new PatientSignUpDto()
+        var userRegistrationDataWithRegisteredEmail = new PatientCredentialsDto()
         {
             Email = validEmail,
             Password = "12345678"
@@ -333,7 +334,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
         var validEmail = $"test{UniqueNumber}@test.gmail.com";
 
-        var userRegistrationDataWithRegisteredEmail = new PatientSignUpDto()
+        var userRegistrationDataWithRegisteredEmail = new PatientCredentialsDto()
         {
             Email = validEmail,
             Password = "12345678"
@@ -375,7 +376,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
         var validEmail = $"test{UniqueNumber}@test.gmail.com";
 
-        var userRegistrationDataWithRegisteredEmail = new PatientSignUpDto()
+        var userRegistrationDataWithRegisteredEmail = new PatientCredentialsDto()
         {
             Email = validEmail,
             Password = "12345678"
@@ -411,6 +412,93 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
 
     #endregion
 
+    #region SignInTests
+
+    [Fact]
+    public async Task TestRegisteredPatientSignsInWithValidCredentials_OK()
+    {
+        // Arrange
+
+        var validUserRegistrationData = new PatientCredentialsDto()
+        {
+            Email = $"test{UniqueNumber}@test.com",
+            Password = "12345678"
+        };
+
+        await _httpClient.PostAsJsonAsync(SignUpEndpointUri, validUserRegistrationData);
+
+        // Act
+
+        var response = await _httpClient.PostAsJsonAsync(SignInEndpointUri, validUserRegistrationData);
+
+
+        // Assert
+
+        Assert.True(response.IsSuccessStatusCode);
+        var generatedTokens = await response.Content.ReadFromJsonAsync<AuthTokenPairDto>();
+
+
+        Assert.NotNull(generatedTokens);
+        Assert.NotNull(generatedTokens.JwtToken);
+        Assert.NotNull(generatedTokens.RefreshToken);
+
+        var userId = ExtractUserIdFromJwtToken(generatedTokens.JwtToken);
+        Assert.NotNull(_factory.UseDbContext(x =>
+            x.Users.SingleOrDefaultAsync(u => u.Id == userId && u.Email == validUserRegistrationData.Email)));
+    }
+
+    [Fact]
+    public async Task TestRegisteredPatientSignsInWithInvalidPassword_Fail()
+    {
+        // Arrange
+
+        var validUserRegistrationData = new PatientCredentialsDto()
+        {
+            Email = $"test{UniqueNumber}@test.com",
+            Password = "12345678"
+        };
+
+        await _httpClient.PostAsJsonAsync(SignUpEndpointUri, validUserRegistrationData);
+
+        var invalidUserCredentials = new PatientCredentialsDto()
+        {
+            Email = validUserRegistrationData.Email,
+            Password = "87654321"
+        };
+
+        // Act
+
+        var response = await _httpClient.PostAsJsonAsync(SignInEndpointUri, invalidUserCredentials);
+        var responseMessage = await response.Content.ReadAsStringAsync();
+
+        // Assert
+
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.Equal(ApiErrorMessage.FailedLoginMessage, responseMessage);
+    }
+
+    [Fact]
+    public async Task TestUnregisteredPatientSignsIn_Fail()
+    {
+        // Arrange
+
+        var unregisteredUserCredentials = new PatientCredentialsDto()
+        {
+            Email = $"test{UniqueNumber}@test.com",
+            Password = "12345678"
+        };
+
+        // Act
+
+        var response = await _httpClient.PostAsJsonAsync(SignInEndpointUri, unregisteredUserCredentials);
+
+
+        // Assert
+
+        Assert.False(response.IsSuccessStatusCode);
+    }
+
+    #endregion
 
     private ClaimsPrincipal ValidateJwtToken(string token)
     {

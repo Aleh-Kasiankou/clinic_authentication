@@ -12,17 +12,20 @@ namespace Innowise.Clinic.Auth.Controllers;
 public class AuthenticationController : ControllerBase
 {
     private readonly UserManager<IdentityUser<Guid>> _userManager;
+    private readonly SignInManager<IdentityUser<Guid>> _signInManager;
     private readonly ITokenGenerator _tokenGenerator;
-
-    public AuthenticationController(UserManager<IdentityUser<Guid>> userManager, ITokenGenerator tokenGenerator)
+    
+    public AuthenticationController(UserManager<IdentityUser<Guid>> userManager, ITokenGenerator tokenGenerator,
+        SignInManager<IdentityUser<Guid>> signInManager)
     {
         _userManager = userManager;
         _tokenGenerator = tokenGenerator;
+        _signInManager = signInManager;
     }
 
 
     [HttpPost("sign-up/patient")]
-    public async Task<ActionResult<AuthTokenPairDto>> RegisterPatient(PatientSignUpDto patientCredentials)
+    public async Task<ActionResult<AuthTokenPairDto>> RegisterPatient(PatientCredentialsDto patientCredentials)
     {
         var userExists = await _userManager.FindByEmailAsync(patientCredentials.Email);
         if (userExists != null)
@@ -51,7 +54,28 @@ public class AuthenticationController : ControllerBase
 
         return Ok(authTokens);
     }
-    
+
+    [HttpPost("sign-in/patient")]
+    public async Task<ActionResult<AuthTokenPairDto>> SignInAsPatient(PatientCredentialsDto patientCredentials)
+    {
+        var user = await _userManager.FindByEmailAsync(patientCredentials.Email);
+        if (user != null)
+        {
+            var signInSucceeded =
+                await _signInManager.UserManager.CheckPasswordAsync(user, patientCredentials.Password);
+            
+            if (signInSucceeded)
+            {
+                var authTokens = await GenerateJwtAndRefreshToken(user);
+
+                return Ok(authTokens);
+            }
+        }
+
+        return BadRequest(ApiErrorMessage.FailedLoginMessage);
+    }
+
+
     [HttpPost("token/refresh")]
     public async Task<ActionResult<string>> RefreshToken([FromBody] AuthTokenPairDto tokens,
         [FromServices] ITokenValidator validator)
