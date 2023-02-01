@@ -22,20 +22,21 @@ public class TokenValidator : ITokenValidator
         _jwtConfiguration = jwtConfiguration;
     }
 
-    public async Task<ClaimsPrincipal> ValidateTokenPairAndExtractPrincipal(AuthTokenPairDto authTokens)
+    public async Task<ClaimsPrincipal> ValidateTokenPairAndExtractPrincipal(AuthTokenPairDto authTokens,
+        bool tokenShouldBeExpired)
     {
-        var principal = ExtractPrincipalFromJwtToken(authTokens.JwtToken);
+        var principal = ExtractPrincipalFromJwtToken(authTokens.JwtToken, tokenShouldBeExpired);
 
         await ValidateRefreshTokenAsync(authTokens.RefreshToken);
 
         return principal;
     }
 
-    private ClaimsPrincipal ExtractPrincipalFromJwtToken(string token)
+    private ClaimsPrincipal ExtractPrincipalFromJwtToken(string token, bool tokenShouldBeExpired)
     {
         var securityToken = new JwtSecurityToken(token);
 
-        if (securityToken.ValidTo > DateTime.UtcNow)
+        if (tokenShouldBeExpired && securityToken.ValidTo > DateTime.UtcNow)
         {
             throw new JwtTokenNotExpiredException();
         }

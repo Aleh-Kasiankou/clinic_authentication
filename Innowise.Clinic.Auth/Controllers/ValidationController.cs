@@ -1,10 +1,11 @@
+using Innowise.Clinic.Auth.Constants;
 using Innowise.Clinic.Auth.Validators.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Innowise.Clinic.Auth.Controllers;
 
 [ApiController]
-[Route("auth/validation")]
+[Route(ControllerRoutes.ValidationControllerRoute)]
 public class ValidationController : ControllerBase
 {
     private const string EmailIsRegisteredMessage = "The account with the provided email is already registered in the system";

@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Innowise.Clinic.Auth.Constants;
 using Innowise.Clinic.Auth.DTO;
+using Innowise.Clinic.Auth.Extensions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -21,11 +22,6 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
     private readonly IntegrationTestingWebApplicationFactory _factory;
     private readonly HttpClient _httpClient;
     private readonly Guid _patientRoleId;
-
-    private const string SignUpEndpointUri = "auth/sign-up/patient";
-    private const string RefreshTokenEndpointUri = "auth/token/refresh";
-    private const string SignInEndpointUri = "auth/sign-in/patient";
-
 
     public AuthenticationControllerTests(IntegrationTestingWebApplicationFactory factory)
     {
@@ -41,6 +37,18 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
     private static int _uniqueNumber = 0;
 
     private static int UniqueNumber => _uniqueNumber++;
+
+    private const string SignUpEndpointUri =
+        ControllerRoutes.AuthenticationControllerRoute + "/" + EndpointRoutes.SignUpEndpointRoute;
+
+    private const string RefreshTokenEndpointUri =
+        ControllerRoutes.AuthenticationControllerRoute + "/" + EndpointRoutes.RefreshTokenEndpointRoute;
+
+    private const string SignInEndpointUri = ControllerRoutes.AuthenticationControllerRoute + "/" +
+                                             EndpointRoutes.SignInEndpointRoute;
+
+    private const string SignOutEndpointUri = ControllerRoutes.AuthenticationControllerRoute + "/" +
+                                              EndpointRoutes.SignOutEndpointRoute;
 
     #region RegistrationTests
 
@@ -474,7 +482,7 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
         // Assert
 
         Assert.False(response.IsSuccessStatusCode);
-        Assert.Equal(ApiErrorMessage.FailedLoginMessage, responseMessage);
+        Assert.Equal(ApiMessages.FailedLoginMessage, responseMessage);
     }
 
     [Fact]
@@ -496,6 +504,84 @@ public class AuthenticationControllerTests : IClassFixture<IntegrationTestingWeb
         // Assert
 
         Assert.False(response.IsSuccessStatusCode);
+    }
+
+    #endregion
+
+    #region TokenRevokeTests
+
+    [Fact]
+    public async Task TestRefreshTokenRevokedWhenPatientSignOutSuccessful_OK()
+    {
+        // Arrange
+
+        var validUserRegistrationData = new PatientCredentialsDto()
+        {
+            Email = $"test{UniqueNumber}@test.com",
+            Password = "12345678"
+        };
+
+        // Act
+
+        var response = await _httpClient.PostAsJsonAsync(SignUpEndpointUri, validUserRegistrationData);
+        var generatedTokens = await response.Content.ReadFromJsonAsync<AuthTokenPairDto>();
+        response = await _httpClient.PostAsJsonAsync(SignOutEndpointUri, generatedTokens);
+
+        // Assert
+
+        Assert.True(response.IsSuccessStatusCode);
+        Assert.False(_factory.UseDbContext(x =>
+            x.RefreshTokens.Any(t => t.TokenId == generatedTokens.GetRefreshTokenId())));
+    }
+
+    [Fact]
+    public async Task TestAllUserTokensRevokedOnTokenRefreshFail_Ok()
+    {
+        // Arrange
+
+        var validUserRegistrationData = new PatientCredentialsDto()
+        {
+            Email = $"test{UniqueNumber}@test.com",
+            Password = "12345678"
+        };
+
+        // Act
+
+        var response = await _httpClient.PostAsJsonAsync(SignUpEndpointUri, validUserRegistrationData);
+        var generatedTokens = await response.Content.ReadFromJsonAsync<AuthTokenPairDto>();
+        response = await _httpClient.PostAsJsonAsync(RefreshTokenEndpointUri, generatedTokens);
+
+        // Assert
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.False(_factory.UseDbContext(x => x.RefreshTokens.Any(t => t.UserId == generatedTokens.GetUserId())));
+    }
+
+    [Fact]
+    public async Task TestAllUserTokensRevokedOnLoginFail_Ok()
+    {
+        // Arrange
+
+        var validUserRegistrationData = new PatientCredentialsDto()
+        {
+            Email = $"test{UniqueNumber}@test.com",
+            Password = "12345678"
+        };
+
+        var invalidUserCredentials = new PatientCredentialsDto()
+        {
+            Email = validUserRegistrationData.Email,
+            Password = "87654321"
+        };
+
+        // Act
+
+        var response = await _httpClient.PostAsJsonAsync(SignUpEndpointUri, validUserRegistrationData);
+        var generatedTokens = await response.Content.ReadFromJsonAsync<AuthTokenPairDto>();
+        response = await _httpClient.PostAsJsonAsync(SignInEndpointUri, invalidUserCredentials);
+
+        // Assert
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.False(_factory.UseDbContext(x => x.RefreshTokens.Any(t => t.UserId == generatedTokens.GetUserId())));
     }
 
     #endregion
